@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -23,7 +23,13 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    const usersCollection = client.db("realEstate").collection("users");
+    const usersCollection = client.db("realEstate").collection("users");    
+    const propertiesCollection = client.db("realEstate").collection("properties");    
+    const wishlistCollection = client.db("realEstate").collection("wishlists");
+
+
+
+
 
     //jwt
     app.post("/jwt", async (req, res) => {
@@ -45,7 +51,71 @@ async function run() {
       } else {
         return res.send({ message: "user already exists", insertedId: null });
       }
+    }); 
+    
+    
+    //get properties
+    app.get("/users", async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result)
     });
+
+
+
+
+    //post properties
+    app.post("/properties", async (req, res) => {
+      const property = req.body;
+      const result = await propertiesCollection.insertOne(property);
+      res.send(result)
+    });  
+    
+    //get properties
+    app.get("/properties", async (req, res) => {
+      const result = await propertiesCollection.find().toArray();
+      res.send(result)
+    });
+
+    //get single properties
+    app.delete("/delete-wishlist-blog/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await wishlistCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    
+
+    //add to wishlist
+    app.post("/add-to-wishlist", async (req, res) => {
+      try {
+        const propertyId = req.body;
+        const result = await wishlistCollection.insertOne(propertyId);
+        res.json(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //get wishlist Blogs
+    app.get("/wishlist-blogs", async (req, res) => {
+      try {
+        let query = {};
+        if (req.query?.email) {
+          query = { email: req.query.email };
+        }
+        const result = await wishlistCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
