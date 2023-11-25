@@ -1,6 +1,6 @@
 const express = require("express");
 const app = express();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
@@ -77,11 +77,11 @@ async function run() {
     });
 
     //get single properties
-    app.delete("/delete-wishlist-blog/:id", async (req, res) => {
+    app.get("/properties/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
-        const result = await wishlistCollection.deleteOne(query);
+        const result = await propertiesCollection.findOne(query);
         res.send(result);
       } catch (error) {
         console.log(error);
