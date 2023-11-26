@@ -77,8 +77,17 @@ async function run() {
 
     // get properties
     app.get("/properties", async (req, res) => {
-      const result = await propertiesCollection.find().toArray();
-      res.send(result);
+      try {
+        const verifiedProperties = await propertiesCollection
+          .find({
+            status: "verified",
+          })
+          .toArray();
+
+        res.send(verifiedProperties);
+      } catch (error) {
+        console.log(error);
+      }
     });
 
     //get single properties
@@ -97,7 +106,7 @@ async function run() {
     app.post("/reviews", async (req, res) => {
       try {
         const review = req.body;
-        review.timestamp = Date.now();
+        review.date = Date.now();
         const result = await reviewsCollection.insertOne(review);
         res.send(result);
       } catch (error) {
@@ -276,6 +285,8 @@ async function run() {
 
     /* admin */
 
+    //advertise properties
+
     //all agents added properties
     app.get("/all-agent-properties", async (req, res) => {
       try {
@@ -338,53 +349,44 @@ async function run() {
       }
     });
 
-     //make admin
-     app.patch(
-      "/users/admin/:id",
-      async (req, res) => {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            role: "admin",
-          },
-        };
-        const result = await usersCollection.updateOne(filter, updatedDoc);
-        res.send(result);
-      }
-    );
+    //make admin
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
-     //make agent
-     app.patch(
-      "/users/admin/:id",
-      async (req, res) => {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            role: "agent",
-          },
-        };
-        const result = await usersCollection.updateOne(filter, updatedDoc);
-        res.send(result);
-      }
-    );
+    //make agent
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "agent",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
     //make fraud
-    app.patch(
-      "/users/admin/:id",
-      async (req, res) => {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            role: "fraud",
-          },
-        };
-        const result = await usersCollection.updateOne(filter, updatedDoc);
-        res.send(result);
-      }
-    );
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "fraud",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
     //delete users
     app.delete("/users/:id", async (req, res) => {
@@ -395,17 +397,21 @@ async function run() {
     });
 
     //all reviews
-     app.get("/reviews", async (req, res) => {
+    app.get("/all-reviews", async (req, res) => {
       try {
-        let query = {};
-        if (req.query?.email) {
-          query = { email: req.query.email };
-        }
-        const result = await reviewsCollection.find(query).toArray();
+        const result = await reviewsCollection.find().toArray();
         res.send(result);
       } catch (error) {
         console.log(error);
       }
+    });
+
+    //delete reviews
+    app.delete("/all-reviews/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await reviewsCollection.deleteOne(query);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
