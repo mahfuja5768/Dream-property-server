@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -26,6 +26,7 @@ async function run() {
     const usersCollection = client.db("realEstate").collection("users");    
     const propertiesCollection = client.db("realEstate").collection("properties");    
     const wishlistCollection = client.db("realEstate").collection("wishlists");
+    const reviewsCollection = client.db("realEstate").collection("reviews");
 
 
 
@@ -88,21 +89,30 @@ async function run() {
       }
     });
 
-    
+      //add review
+      app.post("/reviews", async (req, res) => {
+        try {
+          const review = req.body;
+          const result = await reviewsCollection.insertOne(review);
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+        }
+      });
 
     //add to wishlist
-    app.post("/add-to-wishlist", async (req, res) => {
+    app.post("/wishlists", async (req, res) => {
       try {
-        const propertyId = req.body;
-        const result = await wishlistCollection.insertOne(propertyId);
-        res.json(result);
+        const wishlist = req.body;
+        const result = await wishlistCollection.insertOne(wishlist);
+        res.send(result);
       } catch (error) {
         console.log(error);
       }
     });
 
     //get wishlist Blogs
-    app.get("/wishlist-blogs", async (req, res) => {
+    app.get("/wishlists", async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
