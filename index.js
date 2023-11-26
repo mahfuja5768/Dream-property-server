@@ -32,6 +32,12 @@ async function run() {
     const offerPropertiesCollection = client
       .db("realEstate")
       .collection("offerProperties");
+    const agentAddedPropertiesCollection = client
+      .db("realEstate")
+      .collection("agentAddedProperties");
+    const soldPropertiesCollection = client
+      .db("realEstate")
+      .collection("soldProperties");
 
     //jwt
     app.post("/jwt", async (req, res) => {
@@ -55,12 +61,6 @@ async function run() {
       }
     });
 
-    //get users
-    app.get("/users", async (req, res) => {
-      const result = await usersCollection.find().toArray();
-      res.send(result);
-    });
-
     //update users
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
@@ -71,18 +71,11 @@ async function run() {
           photoUrl: updateUser.photoUrl,
         },
       };
-      const result = await menuCollection.updateOne(filter, updatedDoc);
+      const result = await usersCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
-    //add properties for agent
-    app.post("/properties", async (req, res) => {
-      const property = req.body;
-      const result = await propertiesCollection.insertOne(property);
-      res.send(result);
-    });
-
-    //get properties
+    // get properties
     app.get("/properties", async (req, res) => {
       const result = await propertiesCollection.find().toArray();
       res.send(result);
@@ -112,7 +105,7 @@ async function run() {
       }
     });
 
-    //get wishlist Blogs
+    //get reviews
     app.get("/reviews", async (req, res) => {
       try {
         let query = {};
@@ -174,19 +167,9 @@ async function run() {
         console.log(error);
       }
     });
-    app.delete("/offerProperties/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await offerPropertiesCollection.deleteOne(query);
-        res.send(result);
-      } catch (error) {
-        console.log(error);
-      }
-    });
 
     //offer for property
-    app.post("/offerProperties", async (req, res) => {
+    app.post("/offer-properties", async (req, res) => {
       try {
         const property = req.body;
         property.date = Date.now();
@@ -199,7 +182,7 @@ async function run() {
     });
 
     //get offer properties for users
-    app.get("/offerPropertiesByBuyerEmail", async (req, res) => {
+    app.get("/offer-properties-by-buyer-email", async (req, res) => {
       try {
         const buyerEmail = req.query.buyerEmail;
         const properties = await offerPropertiesCollection
@@ -214,14 +197,211 @@ async function run() {
       }
     });
 
+    //add properties for agent
+    app.post("/agent-properties", async (req, res) => {
+      const property = req.body;
+      property.status = "pending";
+      const result = await agentAddedPropertiesCollection.insertOne(property);
+      res.send(result);
+    });
+
+    //get agent added properties
+    app.get("/agent-properties", async (req, res) => {
+      try {
+        let query = {};
+        if (req.query?.email) {
+          query = { email: req.query.email };
+        }
+        const result = await agentAddedPropertiesCollection
+          .find(query)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //update property by agent
+    app.patch("/agent-properties/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const property = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            /* TODO: set korbo */ propertyImg: property.name,
+            category: property.category,
+            price: property.price,
+            recipe: property.recipe,
+            image: property.image,
+          },
+        };
+        const result = await agentAddedPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //delete property by agent
+    app.delete("/agent-properties/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await agentAddedPropertiesCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
     //get offer properties for agent
-    app.get("/offerProperties", async (req, res) => {
+    app.get("/offer-properties", async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
           query = { email: req.query.email };
         }
         const result = await offerPropertiesCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //TODO: add sold property route
+
+    /* admin */
+
+    //all agents added properties
+    app.get("/all-agent-properties", async (req, res) => {
+      try {
+        const result = await agentAddedPropertiesCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    // verify and add to all properties
+    app.put("/verify-agent-property/:propertyId", async (req, res) => {
+      try {
+        const propertyId = req.params.propertyId;
+
+        const updateResult = await agentAddedPropertiesCollection.updateOne(
+          { _id: ObjectId(propertyId) },
+          { $set: { status: "verified" } }
+        );
+
+        if (updateResult.modifiedCount > 0) {
+          const agentProperty = await agentAddedPropertiesCollection.findOne({
+            _id: ObjectId(propertyId),
+          });
+
+          const insertResult = await propertiesCollection.insertOne(
+            agentProperty
+          );
+
+          res.send(insertResult);
+        } else {
+          res.status(404).send("Property not found");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    // reject properties
+    app.put("/reject-agent-property/:propertyId", async (req, res) => {
+      try {
+        const propertyId = req.params.propertyId;
+
+        const updateResult = await agentAddedPropertiesCollection.updateOne(
+          { _id: ObjectId(propertyId) },
+          { $set: { status: "rejected" } }
+        );
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    //get users
+    app.get("/users", async (req, res) => {
+      try {
+        const result = await usersCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+     //make admin
+     app.patch(
+      "/users/admin/:id",
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
+
+     //make agent
+     app.patch(
+      "/users/admin/:id",
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "agent",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
+
+    //make fraud
+    app.patch(
+      "/users/admin/:id",
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "fraud",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
+
+    //delete users
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //all reviews
+     app.get("/reviews", async (req, res) => {
+      try {
+        let query = {};
+        if (req.query?.email) {
+          query = { email: req.query.email };
+        }
+        const result = await reviewsCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
         console.log(error);
