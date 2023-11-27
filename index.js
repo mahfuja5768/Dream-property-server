@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -47,8 +47,6 @@ async function run() {
       });
       res.send({ token });
     });
-
-
 
     const verifyToken = (req, res, next) => {
       // console.log("inside verifyToken", req.headers.authorization);
@@ -106,7 +104,7 @@ async function run() {
     });
 
     // get properties
-    app.get("/properties",verifyToken, async (req, res) => {
+    app.get("/properties", verifyToken, async (req, res) => {
       // console.log("hi---------------->", req.decoded);
       try {
         const verifiedProperties = await propertiesCollection
@@ -144,8 +142,8 @@ async function run() {
       }
     });
 
-     //get reviews for  specific property
-     app.get("/user-reviews/:email",verifyToken, async (req, res) => {
+    //get reviews for  specific property
+    app.get("/user-reviews/:email", verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
         const query = { email: email };
@@ -186,9 +184,9 @@ async function run() {
     app.post("/wishlists", verifyToken, async (req, res) => {
       try {
         const wishlist = req.body;
-        console.log(wishlist)
+        console.log(wishlist);
         const result = await wishlistCollection.insertOne(wishlist);
-        console.log(result)
+        console.log(result);
         res.send(result);
       } catch (error) {
         console.log(error);
@@ -196,16 +194,38 @@ async function run() {
     });
 
     //get wishlist properties
-    app.get("/user-wishlists/:email",verifyToken, async (req, res) => {
-      try {
-        const email = req.params.email;
-        const query = { email: email };
-        const result = await wishlistCollection.find(query).toArray();
-        res.send(result);
-      } catch (error) {
-        console.log(error);
-      }
-    });
+   app.get("/user-wishlists/:email",verifyToken, async (req, res) => {
+     try {
+       const email = req.params.email;
+       const query = { email: email };
+
+       const result = await wishlistCollection.find(query).toArray();
+
+       const propertyData = result.map((item) => ({
+         propertyId: item.propertyId,
+         status: item.status,
+       }));
+
+       console.log(propertyData);
+       const allProperties = await propertiesCollection.find().toArray();
+
+       const properties = allProperties.filter((item) =>
+         propertyData.some((data) => data.propertyId === item._id.toString())
+       );
+       const finalProperties = properties.map((property) => {
+         const correspondingData = propertyData.find(
+           (data) => data.propertyId === property._id.toString()
+         );
+         return { ...property, status: correspondingData.status };
+       });
+
+       console.log("wishlist---->", finalProperties);
+
+       res.send(finalProperties);
+     } catch (error) {
+       console.log(error);
+     }
+   });
 
     //delete wishlist property
     app.delete("/wishlists/:id", verifyToken, async (req, res) => {
@@ -223,7 +243,6 @@ async function run() {
     app.post("/offer-properties", verifyToken, async (req, res) => {
       try {
         const property = req.body;
-        property.date = Date.now();
         property.status = "pending";
         const result = await offerPropertiesCollection.insertOne(property);
         res.send(result);
