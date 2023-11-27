@@ -48,8 +48,38 @@ async function run() {
       res.send({ token });
     });
 
+
+
+    const verifyToken = (req, res, next) => {
+      // console.log("inside verifyToken", req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "Unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "Unauthorized access" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    //use verify admin after verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+
+      next();
+    };
+
     //post users
-    app.post("/users", async (req, res) => {
+    app.post("/users", verifyToken, async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
       const existingUser = await usersCollection.findOne(query);
@@ -62,7 +92,7 @@ async function run() {
     });
 
     //update users
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/users/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const updateUser = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -76,14 +106,15 @@ async function run() {
     });
 
     // get properties
-    app.get("/properties", async (req, res) => {
+    app.get("/properties",verifyToken, async (req, res) => {
+      // console.log("hi---------------->", req.decoded);
       try {
         const verifiedProperties = await propertiesCollection
           .find({
             status: "verified",
           })
           .toArray();
-
+        // console.log(verifiedProperties)
         res.send(verifiedProperties);
       } catch (error) {
         console.log(error);
@@ -91,7 +122,7 @@ async function run() {
     });
 
     //get single properties
-    app.get("/properties/:id", async (req, res) => {
+    app.get("/properties/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -103,10 +134,9 @@ async function run() {
     });
 
     //add review
-    app.post("/reviews", async (req, res) => {
+    app.post("/reviews", verifyToken, async (req, res) => {
       try {
         const review = req.body;
-        review.date = Date.now();
         const result = await reviewsCollection.insertOne(review);
         res.send(result);
       } catch (error) {
@@ -114,8 +144,20 @@ async function run() {
       }
     });
 
+     //get reviews for  specific property
+     app.get("/user-reviews/:email",verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await reviewsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
     //get reviews
-    app.get("/reviews", async (req, res) => {
+    app.get("/reviews", verifyToken, async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
@@ -129,7 +171,7 @@ async function run() {
     });
 
     //delete reviews
-    app.delete("/reviews/:id", async (req, res) => {
+    app.delete("/reviews/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -141,10 +183,12 @@ async function run() {
     });
 
     //add to wishlist
-    app.post("/wishlists", async (req, res) => {
+    app.post("/wishlists", verifyToken, async (req, res) => {
       try {
         const wishlist = req.body;
+        console.log(wishlist)
         const result = await wishlistCollection.insertOne(wishlist);
+        console.log(result)
         res.send(result);
       } catch (error) {
         console.log(error);
@@ -152,12 +196,10 @@ async function run() {
     });
 
     //get wishlist properties
-    app.get("/wishlists", async (req, res) => {
+    app.get("/user-wishlists/:email",verifyToken, async (req, res) => {
       try {
-        let query = {};
-        if (req.query?.email) {
-          query = { email: req.query.email };
-        }
+        const email = req.params.email;
+        const query = { email: email };
         const result = await wishlistCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
@@ -166,7 +208,7 @@ async function run() {
     });
 
     //delete wishlist property
-    app.delete("/wishlists/:id", async (req, res) => {
+    app.delete("/wishlists/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -178,7 +220,7 @@ async function run() {
     });
 
     //offer for property
-    app.post("/offer-properties", async (req, res) => {
+    app.post("/offer-properties", verifyToken, async (req, res) => {
       try {
         const property = req.body;
         property.date = Date.now();
@@ -191,23 +233,27 @@ async function run() {
     });
 
     //get offer properties for users
-    app.get("/offer-properties-by-buyer-email", async (req, res) => {
-      try {
-        const buyerEmail = req.query.buyerEmail;
-        const properties = await offerPropertiesCollection
-          .find({
-            buyerEmail: buyerEmail,
-          })
-          .toArray();
+    app.get(
+      "/offer-properties-by-buyer-email",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const buyerEmail = req.query.buyerEmail;
+          const properties = await offerPropertiesCollection
+            .find({
+              buyerEmail: buyerEmail,
+            })
+            .toArray();
 
-        res.send(properties);
-      } catch (error) {
-        console.log(error);
+          res.send(properties);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     //add properties for agent
-    app.post("/agent-properties", async (req, res) => {
+    app.post("/agent-properties", verifyToken, async (req, res) => {
       const property = req.body;
       property.status = "pending";
       const result = await agentAddedPropertiesCollection.insertOne(property);
@@ -215,7 +261,7 @@ async function run() {
     });
 
     //get agent added properties
-    app.get("/agent-properties", async (req, res) => {
+    app.get("/agent-properties", verifyToken, async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
@@ -231,7 +277,7 @@ async function run() {
     });
 
     //update property by agent
-    app.patch("/agent-properties/:id", async (req, res) => {
+    app.patch("/agent-properties/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const property = req.body;
@@ -256,7 +302,7 @@ async function run() {
     });
 
     //delete property by agent
-    app.delete("/agent-properties/:id", async (req, res) => {
+    app.delete("/agent-properties/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -268,7 +314,7 @@ async function run() {
     });
 
     //get offer properties for agent
-    app.get("/offer-properties", async (req, res) => {
+    app.get("/offer-properties", verifyToken, async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
@@ -288,7 +334,7 @@ async function run() {
     //advertise properties
 
     //all agents added properties
-    app.get("/all-agent-properties", async (req, res) => {
+    app.get("/all-agent-properties", verifyToken, async (req, res) => {
       try {
         const result = await agentAddedPropertiesCollection.find().toArray();
         res.send(result);
@@ -298,49 +344,57 @@ async function run() {
     });
 
     // verify and add to all properties
-    app.put("/verify-agent-property/:propertyId", async (req, res) => {
-      try {
-        const propertyId = req.params.propertyId;
+    app.put(
+      "/verify-agent-property/:propertyId",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const propertyId = req.params.propertyId;
 
-        const updateResult = await agentAddedPropertiesCollection.updateOne(
-          { _id: ObjectId(propertyId) },
-          { $set: { status: "verified" } }
-        );
-
-        if (updateResult.modifiedCount > 0) {
-          const agentProperty = await agentAddedPropertiesCollection.findOne({
-            _id: ObjectId(propertyId),
-          });
-
-          const insertResult = await propertiesCollection.insertOne(
-            agentProperty
+          const updateResult = await agentAddedPropertiesCollection.updateOne(
+            { _id: ObjectId(propertyId) },
+            { $set: { status: "verified" } }
           );
 
-          res.send(insertResult);
-        } else {
-          res.status(404).send("Property not found");
+          if (updateResult.modifiedCount > 0) {
+            const agentProperty = await agentAddedPropertiesCollection.findOne({
+              _id: ObjectId(propertyId),
+            });
+
+            const insertResult = await propertiesCollection.insertOne(
+              agentProperty
+            );
+
+            res.send(insertResult);
+          } else {
+            res.status(404).send("Property not found");
+          }
+        } catch (error) {
+          console.error(error);
         }
-      } catch (error) {
-        console.error(error);
       }
-    });
+    );
 
     // reject properties
-    app.put("/reject-agent-property/:propertyId", async (req, res) => {
-      try {
-        const propertyId = req.params.propertyId;
+    app.put(
+      "/reject-agent-property/:propertyId",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const propertyId = req.params.propertyId;
 
-        const updateResult = await agentAddedPropertiesCollection.updateOne(
-          { _id: ObjectId(propertyId) },
-          { $set: { status: "rejected" } }
-        );
-      } catch (error) {
-        console.error(error);
+          const updateResult = await agentAddedPropertiesCollection.updateOne(
+            { _id: ObjectId(propertyId) },
+            { $set: { status: "rejected" } }
+          );
+        } catch (error) {
+          console.error(error);
+        }
       }
-    });
+    );
 
     //get users
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       try {
         const result = await usersCollection.find().toArray();
         res.send(result);
@@ -350,7 +404,7 @@ async function run() {
     });
 
     //make admin
-    app.patch("/users/admin/:id", async (req, res) => {
+    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -363,7 +417,7 @@ async function run() {
     });
 
     //make agent
-    app.patch("/users/admin/:id", async (req, res) => {
+    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -376,7 +430,7 @@ async function run() {
     });
 
     //make fraud
-    app.patch("/users/admin/:id", async (req, res) => {
+    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -389,7 +443,7 @@ async function run() {
     });
 
     //delete users
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
@@ -397,7 +451,7 @@ async function run() {
     });
 
     //all reviews
-    app.get("/all-reviews", async (req, res) => {
+    app.get("/all-reviews", verifyToken, async (req, res) => {
       try {
         const result = await reviewsCollection.find().toArray();
         res.send(result);
@@ -407,7 +461,7 @@ async function run() {
     });
 
     //delete reviews
-    app.delete("/all-reviews/:id", async (req, res) => {
+    app.delete("/all-reviews/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await reviewsCollection.deleteOne(query);
