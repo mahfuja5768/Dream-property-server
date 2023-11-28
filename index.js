@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -154,14 +154,34 @@ async function run() {
       }
     });
 
-    //get reviews
-    app.get("/reviews", verifyToken, async (req, res) => {
+    //get reviews for home page
+    app.get("/reviews-for-home", async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
           query = { email: req.query.email };
         }
-        const result = await reviewsCollection.find(query).toArray();
+        const result = await reviewsCollection
+          .find(query)
+          .sort({ date: -1 }).limit(4)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //get reviews
+    app.get("/reviews",verifyToken, async (req, res) => {
+      try {
+        let query = {};
+        if (req.query?.email) {
+          query = { email: req.query.email };
+        }
+        const result = await reviewsCollection
+          .find(query)
+          .sort({ date: -1 })
+          .toArray();
         res.send(result);
       } catch (error) {
         console.log(error);
