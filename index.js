@@ -1,9 +1,9 @@
 const express = require("express");
-const app = express();
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const jwt = require("jsonwebtoken");
-const cors = require("cors");
 require("dotenv").config();
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const app = express();
 
 const port = process.env.PORT || 5000;
 
@@ -21,7 +21,7 @@ const client = new MongoClient(process.env.DB_URI, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client.db("realEstate").collection("users");
     const propertiesCollection = client
@@ -496,3 +496,7 @@ app.get("/", (req, res) => {
 app.listen(port, (req, res) => {
   console.log(`Dream property is running on ${port}`);
 });
+
+
+/* fuzzy-school.surge.sh */
+/* astonishing-doll.surge.sh */
