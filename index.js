@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -300,18 +300,33 @@ async function run() {
     app.post("/agent-properties", verifyToken, async (req, res) => {
       const property = req.body;
       property.status = "pending";
-      const result = await agentAddedPropertiesCollection.insertOne(property);
+      const result = await propertiesCollection.insertOne(property);
       res.send(result);
     });
 
     //get agent added properties
-    app.get("/agent-properties", async (req, res) => {
+    app.get("/agent-properties", verifyToken, async (req, res) => {
       try {
         let query = {};
 
         if (req.query?.email) {
           query.agentEmail = req.query.email;
         }
+        const result = await agentAddedPropertiesCollection
+          .find(query)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    //get a agent added properties
+    app.get("/agent-properties/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const property = req.body;
+        const query = { _id: new ObjectId(id) };
         const result = await agentAddedPropertiesCollection
           .find(query)
           .toArray();
@@ -329,17 +344,21 @@ async function run() {
         const filter = { _id: new ObjectId(id) };
         const updatedDoc = {
           $set: {
-            /* TODO: set korbo */ propertyImg: property.name,
-            category: property.category,
-            price: property.price,
-            recipe: property.recipe,
-            image: property.image,
+            title: property.title,
+            location: property.location,
+            propertyImg: property.propertyImg,
+            agentImg: property.agentImg,
+            priceRange: property.priceRange,
+            agentName: property.agentName,
+            agentEmail: property.agentEmail,
           },
         };
+        console.log(updatedDoc);
         const result = await agentAddedPropertiesCollection.updateOne(
           filter,
           updatedDoc
         );
+        console.log(result);
         res.send(result);
       } catch (error) {
         console.log(error);
@@ -393,37 +412,60 @@ async function run() {
       }
     });
 
+    //add agent properties to all properties
+    app.post("/add-to-properties", verifyToken, async (req, res) => {
+      const property = req.body;
+      console.log(property);
+      const result = await propertiesCollection.insertOne(property);
+      console.log(result);
+      res.send(result);
+    });
+
     // verify and add to all properties
-    app.put(
-      "/verify-agent-property/:propertyId",
-      verifyToken,
-      async (req, res) => {
-        try {
-          const propertyId = req.params.propertyId;
-
-          const updateResult = await agentAddedPropertiesCollection.updateOne(
-            { _id: ObjectId(propertyId) },
-            { $set: { status: "verified" } }
-          );
-
-          if (updateResult.modifiedCount > 0) {
-            const agentProperty = await agentAddedPropertiesCollection.findOne({
-              _id: ObjectId(propertyId),
-            });
-
-            const insertResult = await propertiesCollection.insertOne(
-              agentProperty
-            );
-
-            res.send(insertResult);
-          } else {
-            res.status(404).send("Property not found");
-          }
-        } catch (error) {
-          console.error(error);
-        }
+    app.patch("/verify-agent-property/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        console.log(filter);
+        const updatedDoc = {
+          $set: {
+            status: "verified",
+          },
+        };
+        console.log(updatedDoc);
+        const result = await agentAddedPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        console.log(result);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
       }
-    );
+    });
+
+    // verify and add to all properties
+    app.patch("/reject-agent-property/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        console.log(filter);
+        const updatedDoc = {
+          $set: {
+            status: "rejected",
+          },
+        };
+        console.log(updatedDoc);
+        const result = await agentAddedPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        console.log(result);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+      }
+    });
 
     //accept request
     app.patch(
@@ -512,7 +554,7 @@ async function run() {
     });
 
     //make admin
-    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
+    app.patch("/users/make-admin/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -525,7 +567,7 @@ async function run() {
     });
 
     //make agent
-    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
+    app.put("/users/make-agent/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -538,7 +580,7 @@ async function run() {
     });
 
     //make fraud
-    app.patch("/users/admin/:id", verifyToken, async (req, res) => {
+    app.patch("/users/mark-fraud/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
