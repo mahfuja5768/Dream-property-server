@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -126,9 +126,9 @@ async function run() {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
-        console.log('mmmm----------->',query)
+        console.log("mmmm----------->", query);
         const result = await propertiesCollection.findOne(query);
-         console.log(result)
+        console.log(result);
         res.send(result);
       } catch (error) {
         console.log(error);
@@ -264,6 +264,18 @@ async function run() {
       }
     });
 
+    //get a offer property
+    app.get("/offer-properties/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await offerPropertiesCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
     //get offer properties for users
     app.get(
       "/offer-properties-for-buyer/:email",
@@ -293,11 +305,12 @@ async function run() {
     });
 
     //get agent added properties
-    app.get("/agent-properties", verifyToken, async (req, res) => {
+    app.get("/agent-properties", async (req, res) => {
       try {
         let query = {};
+
         if (req.query?.email) {
-          query = { email: req.query.email };
+          query.agentEmail = req.query.email;
         }
         const result = await agentAddedPropertiesCollection
           .find(query)
@@ -346,11 +359,18 @@ async function run() {
     });
 
     //get offer properties for agent
-    app.get("/offer-properties/:email", verifyToken, async (req, res) => {
+    app.get("/requested-properties", async (req, res) => {
       try {
-        const email = req.params.email;
-        const query = { agentEmail: email };
+        let query = { status: "pending" };
+
+        if (req.query?.email) {
+          query.agentEmail = req.query.email;
+        }
+
+        console.log(query);
+
         const result = await offerPropertiesCollection.find(query).toArray();
+
         res.send(result);
       } catch (error) {
         console.log(error);
@@ -405,23 +425,67 @@ async function run() {
       }
     );
 
-    // reject properties
-    app.put(
-      "/reject-agent-property/:propertyId",
+    //accept request
+    app.patch(
+      "/accept-requested-property/:id",
       verifyToken,
       async (req, res) => {
-        try {
-          const propertyId = req.params.propertyId;
-
-          const updateResult = await agentAddedPropertiesCollection.updateOne(
-            { _id: ObjectId(propertyId) },
-            { $set: { status: "rejected" } }
-          );
-        } catch (error) {
-          console.error(error);
-        }
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        console.log(filter);
+        const updatedDoc = {
+          $set: {
+            status: "accepted",
+          },
+        };
+        console.log(updatedDoc);
+        const result = await offerPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        console.log(result);
+        res.send(result);
       }
     );
+
+    //reject request
+    app.patch(
+      "/reject-requested-property/:id",
+      verifyToken,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        console.log(filter);
+        const updatedDoc = {
+          $set: {
+            status: "rejected",
+          },
+        };
+        console.log(updatedDoc);
+        const result = await offerPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        console.log(result);
+        res.send(result);
+      }
+    );
+
+    //get agent sold properties
+    app.get("/sold-properties", async (req, res) => {
+      try {
+        let query = {};
+        if (req.query?.email) {
+          query.agentEmail = req.query.email;
+        }
+
+        console.log(query);
+        const result = await paymentCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
 
     //get role
     app.get("/user-role/:email", verifyToken, async (req, res) => {
@@ -513,7 +577,7 @@ async function run() {
     });
 
     //payment intent
-    app.post("/create-payment-intent", async (req, res) => {
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount, "aaa---->");
@@ -528,19 +592,32 @@ async function run() {
     });
 
     //payment related api
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyToken, async (req, res) => {
       try {
         const payment = req.body;
         const paymentResult = await paymentCollection.insertOne(payment);
-        const offerPropertyId = payment.offerPropertyId;
-        const updateResult = await offerPropertiesCollection.updateOne(
-          { _id: new ObjectId(offerPropertyId) },
-          { $set: { status: "accepted" } }
-        );
-        res.send(updateResult);
+        res.send(paymentResult);
       } catch (error) {
         console.log(error);
       }
+    });
+
+    app.patch("/brought-property-status/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      console.log(filter);
+      const updatedDoc = {
+        $set: {
+          status: "brought",
+        },
+      };
+      console.log(updatedDoc);
+      const result = await offerPropertiesCollection.updateOne(
+        filter,
+        updatedDoc
+      );
+      console.log(result);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
