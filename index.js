@@ -431,7 +431,7 @@ async function run() {
       }
     });
     // ads status properties
-    app.delete("/advertise-properties/:id", verifyToken,verifyAdmin,, async (req, res) => {
+    app.delete("/advertise-properties/:id", verifyToken,verifyAdmin, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { propertyId: id };
