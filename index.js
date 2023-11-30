@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -80,13 +80,15 @@ async function run() {
 
       next();
     };
-    //use verify admin after verifyToken
+    //use verify agent after verifyToken
     const verifyAgent = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
+      console.log(query);
       const user = await usersCollection.findOne(query);
-      const isAdmin = user?.role === "agent";
-      if (!isAdmin) {
+      const isAgent = user?.role === "agent";
+      console.log(isAgent);
+      if (!isAgent) {
         return res.status(403).send({ message: "Forbidden access" });
       }
 
@@ -106,7 +108,6 @@ async function run() {
       }
     });
 
-
     // get properties
     app.get("/properties", verifyToken, async (req, res) => {
       // console.log("hi---------------->", req.decoded);
@@ -115,6 +116,21 @@ async function run() {
           .find({
             status: "verified",
           })
+          .toArray();
+        // console.log(verifiedProperties)
+        res.send(verifiedProperties);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    app.get("/sort-properties", verifyToken, async (req, res) => {
+      // console.log("hi---------------->", req.decoded);
+      try {
+        const verifiedProperties = await propertiesCollection
+          .find({
+            status: "verified",
+          }).sort()
           .toArray();
         // console.log(verifiedProperties)
         res.send(verifiedProperties);
@@ -299,15 +315,20 @@ async function run() {
     );
 
     //add properties for agent
-    app.post("/agent-properties",verifyAgent, verifyToken, async (req, res) => {
-      const property = req.body;
-      property.status = "pending";
-      const result = await agentAddedPropertiesCollection.insertOne(property);
-      res.send(result);
-    });
+    app.post(
+      "/agent-properties",
+      verifyToken,
+      verifyAgent,
+      async (req, res) => {
+        const property = req.body;
+        property.status = "pending";
+        const result = await agentAddedPropertiesCollection.insertOne(property);
+        res.send(result);
+      }
+    );
 
     //get agent added properties
-    app.get("/agent-properties",verifyAgent, verifyToken, async (req, res) => {
+    app.get("/agent-properties", verifyToken, verifyAgent, async (req, res) => {
       try {
         let query = {};
 
@@ -324,86 +345,111 @@ async function run() {
     });
 
     //get a agent added properties
-    app.get("/agent-properties/:id", verifyToken, verifyAgent, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const property = req.body;
-        const query = { _id: new ObjectId(id) };
-        const result = await agentAddedPropertiesCollection
-          .find(query)
-          .toArray();
-        res.send(result);
-      } catch (error) {
-        console.log(error);
+    app.get(
+      "/agent-properties/:id",
+      verifyToken,
+      verifyAgent,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const property = req.body;
+          const query = { _id: new ObjectId(id) };
+          const result = await agentAddedPropertiesCollection
+            .find(query)
+            .toArray();
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     //update property by agent
-    app.patch("/agent-properties/:id", verifyToken, verifyAgent, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const property = req.body;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            title: property.title,
-            location: property.location,
-            propertyImg: property.propertyImg,
-            agentImg: property.agentImg,
-            priceRange: property.priceRange,
-            agentName: property.agentName,
-            agentEmail: property.agentEmail,
-          },
-        };
-        console.log(updatedDoc);
-        const result = await agentAddedPropertiesCollection.updateOne(
-          filter,
-          updatedDoc
-        );
-        console.log(result);
-        res.send(result);
-      } catch (error) {
-        console.log(error);
+    app.patch(
+      "/agent-properties/:id",
+      verifyToken,
+      verifyAgent,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const property = req.body;
+          const filter = { _id: new ObjectId(id) };
+          const updatedDoc = {
+            $set: {
+              title: property.title,
+              location: property.location,
+              propertyImg: property.propertyImg,
+              agentImg: property.agentImg,
+              priceRange: property.priceRange,
+              agentName: property.agentName,
+              agentEmail: property.agentEmail,
+            },
+          };
+          console.log(updatedDoc);
+          const result = await agentAddedPropertiesCollection.updateOne(
+            filter,
+            updatedDoc
+          );
+          console.log(result);
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     //delete property by agent
-    app.delete("/agent-properties/:id", verifyToken, verifyAgent, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await agentAddedPropertiesCollection.deleteOne(query);
-        res.send(result);
-      } catch (error) {
-        console.log(error);
+    app.delete(
+      "/agent-properties/:id",
+      verifyToken,
+      verifyAgent,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await agentAddedPropertiesCollection.deleteOne(query);
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     //get offer properties for agent
-    app.get("/requested-properties",verifyToken, verifyAgent, async (req, res) => {
-      try {
-        let query = { status: "pending" };
+    app.get(
+      "/requested-properties",
+      verifyToken,
+      verifyAgent,
+      async (req, res) => {
+        try {
+          let query = { status: "pending" };
 
-        if (req.query?.email) {
-          query.agentEmail = req.query.email;
+          if (req.query?.email) {
+            query.agentEmail = req.query.email;
+          }
+
+          console.log(query);
+
+          const result = await offerPropertiesCollection.find(query).toArray();
+
+          res.send(result);
+        } catch (error) {
+          console.log(error);
         }
-
-        console.log(query);
-
-        const result = await offerPropertiesCollection.find(query).toArray();
-
-        res.send(result);
-      } catch (error) {
-        console.log(error);
       }
-    });
+    );
 
     //post advertise properties
-    app.post("/advertise-properties", verifyToken,verifyAdmin, async (req, res) => {
-      const property = req.body;
-      const result = await advertiseCollection.insertOne(property);
-      res.send(result);
-    });
+    app.post(
+      "/advertise-properties",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const property = req.body;
+        const result = await advertiseCollection.insertOne(property);
+        res.send(result);
+      }
+    );
 
     //get advertise properties
     app.get("/advertise-properties", async (req, res) => {
@@ -412,7 +458,7 @@ async function run() {
     });
 
     // ads status properties
-    app.patch("/ads-status/:id", verifyToken,verifyAdmin, async (req, res) => {
+    app.patch("/ads-status/:id", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
@@ -431,109 +477,143 @@ async function run() {
       }
     });
     // ads status properties
-    app.delete("/advertise-properties/:id", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { propertyId: id };
-        const getProperty = await advertiseCollection.deleteOne(query);
+    app.delete(
+      "/advertise-properties/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const query = { propertyId: id };
+          const getProperty = await advertiseCollection.deleteOne(query);
 
-        console.log(getProperty);
-        res.send(result);
-      } catch (error) {
-        console.error(error);
+          console.log(getProperty);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+        }
       }
-    });
+    );
 
     //todo
     // ads status properties
-    app.put("/remove-status/:id", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        console.log(filter);
-        const updatedDoc = {
-          $unset: {
-            adStatus: 1,
-          },
-        };
-        console.log(updatedDoc);
-        const result = await propertiesCollection.updateOne(filter, updatedDoc);
-        console.log(result);
-        res.send(result);
-      } catch (error) {
-        console.error(error);
+    app.put(
+      "/remove-status/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const filter = { _id: new ObjectId(id) };
+          console.log(filter);
+          const updatedDoc = {
+            $unset: {
+              adStatus: 1,
+            },
+          };
+          console.log(updatedDoc);
+          const result = await propertiesCollection.updateOne(
+            filter,
+            updatedDoc
+          );
+          console.log(result);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+        }
       }
-    });
+    );
 
     //all agents added properties
-    app.get("/all-agent-properties", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const result = await agentAddedPropertiesCollection.find().toArray();
-        res.send(result);
-      } catch (error) {
-        console.log(error);
+    app.get(
+      "/all-agent-properties",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const result = await agentAddedPropertiesCollection.find().toArray();
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+        }
       }
-    });
+    );
 
     //add agent properties to all properties
-    app.post("/add-to-properties", verifyToken,verifyAdmin, async (req, res) => {
-      const property = req.body;
-      console.log(property);
-      const result = await propertiesCollection.insertOne(property);
-      console.log(result);
-      res.send(result);
-    });
-
-    // verify and add to all properties
-    app.patch("/verify-agent-property/:id", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        console.log(filter);
-        const updatedDoc = {
-          $set: {
-            status: "verified",
-          },
-        };
-        console.log(updatedDoc);
-        const result = await agentAddedPropertiesCollection.updateOne(
-          filter,
-          updatedDoc
-        );
+    app.post(
+      "/add-to-properties",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const property = req.body;
+        console.log(property);
+        const result = await propertiesCollection.insertOne(property);
         console.log(result);
         res.send(result);
-      } catch (error) {
-        console.error(error);
       }
-    });
+    );
 
     // verify and add to all properties
-    app.patch("/reject-agent-property/:id", verifyToken,verifyAdmin, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        console.log(filter);
-        const updatedDoc = {
-          $set: {
-            status: "rejected",
-          },
-        };
-        console.log(updatedDoc);
-        const result = await agentAddedPropertiesCollection.updateOne(
-          filter,
-          updatedDoc
-        );
-        console.log(result);
-        res.send(result);
-      } catch (error) {
-        console.error(error);
+    app.patch(
+      "/verify-agent-property/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const filter = { _id: new ObjectId(id) };
+          console.log(filter);
+          const updatedDoc = {
+            $set: {
+              status: "verified",
+            },
+          };
+          console.log(updatedDoc);
+          const result = await agentAddedPropertiesCollection.updateOne(
+            filter,
+            updatedDoc
+          );
+          console.log(result);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+        }
       }
-    });
+    );
+
+    // verify and add to all properties
+    app.patch(
+      "/reject-agent-property/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const filter = { _id: new ObjectId(id) };
+          console.log(filter);
+          const updatedDoc = {
+            $set: {
+              status: "rejected",
+            },
+          };
+          console.log(updatedDoc);
+          const result = await agentAddedPropertiesCollection.updateOne(
+            filter,
+            updatedDoc
+          );
+          console.log(result);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    );
 
     //accept request
     app.patch(
       "/accept-requested-property/:id",
-      verifyToken, verifyAgent,
+      verifyToken,
+      verifyAgent,
       async (req, res) => {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
@@ -556,7 +636,8 @@ async function run() {
     //reject request
     app.patch(
       "/reject-requested-property/:id",
-      verifyToken,  verifyAgent,
+      verifyToken,
+      verifyAgent,
       async (req, res) => {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
@@ -577,7 +658,7 @@ async function run() {
     );
 
     //get agent sold properties
-    app.get("/sold-properties",verifyToken,verifyAgent, async (req, res) => {
+    app.get("/sold-properties", verifyToken, verifyAgent, async (req, res) => {
       try {
         let query = {};
         if (req.query?.email) {
@@ -607,7 +688,7 @@ async function run() {
     });
 
     //get users
-    app.get("/users", verifyToken,verifyAdmin, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const result = await usersCollection.find().toArray();
         res.send(result);
@@ -617,46 +698,61 @@ async function run() {
     });
 
     //make admin
-    app.patch("/users/make-admin/:id", verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/make-admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     //make agent
-    app.put("/users/make-agent/:id", verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "agent",
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.put(
+      "/users/make-agent/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "agent",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     //make fraud
-    app.patch("/users/mark-fraud/:id", verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "fraud",
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/mark-fraud/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "fraud",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     //delete users
-    app.delete("/users/:id", verifyToken,verifyAdmin, async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
@@ -664,7 +760,7 @@ async function run() {
     });
 
     //all reviews
-    app.get("/all-reviews", verifyToken,verifyAdmin, async (req, res) => {
+    app.get("/all-reviews", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const result = await reviewsCollection.find().toArray();
         res.send(result);
@@ -674,12 +770,17 @@ async function run() {
     });
 
     //delete reviews
-    app.delete("/all-reviews/:id", verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await reviewsCollection.deleteOne(query);
-      res.send(result);
-    });
+    app.delete(
+      "/all-reviews/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await reviewsCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     //payment intent
     app.post("/create-payment-intent", verifyToken, async (req, res) => {
@@ -707,7 +808,7 @@ async function run() {
       }
     });
 
-    app.patch("/brought-property-status/:id", verifyToken,verifyAgent, async (req, res) => {
+    app.patch("/brought-property-status/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       console.log(filter);
