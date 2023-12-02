@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -130,7 +130,8 @@ async function run() {
         const verifiedProperties = await propertiesCollection
           .find({
             status: "verified",
-          }).sort()
+          })
+          .sort()
           .toArray();
         // console.log(verifiedProperties)
         res.send(verifiedProperties);
@@ -315,20 +316,15 @@ async function run() {
     );
 
     //add properties for agent
-    app.post(
-      "/agent-properties",
-      verifyToken,
-      verifyAgent,
-      async (req, res) => {
-        const property = req.body;
-        property.status = "pending";
-        const result = await agentAddedPropertiesCollection.insertOne(property);
-        res.send(result);
-      }
-    );
+    app.post("/agent-properties", verifyToken, async (req, res) => {
+      const property = req.body;
+      property.status = "pending";
+      const result = await agentAddedPropertiesCollection.insertOne(property);
+      res.send(result);
+    });
 
     //get agent added properties
-    app.get("/agent-properties", verifyToken, verifyAgent, async (req, res) => {
+    app.get("/agent-properties", verifyToken, async (req, res) => {
       try {
         let query = {};
 
@@ -345,99 +341,79 @@ async function run() {
     });
 
     //get a agent added properties
-    app.get(
-      "/agent-properties/:id",
-      verifyToken,
-      verifyAgent,
-      async (req, res) => {
-        try {
-          const id = req.params.id;
-          const property = req.body;
-          const query = { _id: new ObjectId(id) };
-          const result = await agentAddedPropertiesCollection
-            .find(query)
-            .toArray();
-          res.send(result);
-        } catch (error) {
-          console.log(error);
-        }
+    app.get("/agent-properties/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const property = req.body;
+        const query = { _id: new ObjectId(id) };
+        const result = await agentAddedPropertiesCollection
+          .find(query)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
       }
-    );
+    });
 
     //update property by agent
-    app.patch(
-      "/agent-properties/:id",
-      verifyToken,
-      verifyAgent,
-      async (req, res) => {
-        try {
-          const id = req.params.id;
-          const property = req.body;
-          const filter = { _id: new ObjectId(id) };
-          const updatedDoc = {
-            $set: {
-              title: property.title,
-              location: property.location,
-              propertyImg: property.propertyImg,
-              agentImg: property.agentImg,
-              priceRange: property.priceRange,
-              agentName: property.agentName,
-              agentEmail: property.agentEmail,
-            },
-          };
-          console.log(updatedDoc);
-          const result = await agentAddedPropertiesCollection.updateOne(
-            filter,
-            updatedDoc
-          );
-          console.log(result);
-          res.send(result);
-        } catch (error) {
-          console.log(error);
-        }
+    app.patch("/agent-properties/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const property = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            title: property.title,
+            location: property.location,
+            propertyImg: property.propertyImg,
+            agentImg: property.agentImg,
+            priceRange: property.priceRange,
+            agentName: property.agentName,
+            agentEmail: property.agentEmail,
+          },
+        };
+        console.log(updatedDoc);
+        const result = await agentAddedPropertiesCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        console.log(result);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
       }
-    );
+    });
 
     //delete property by agent
-    app.delete(
-      "/agent-properties/:id",
-      verifyToken,
-      verifyAgent,
-      async (req, res) => {
-        try {
-          const id = req.params.id;
-          const query = { _id: new ObjectId(id) };
-          const result = await agentAddedPropertiesCollection.deleteOne(query);
-          res.send(result);
-        } catch (error) {
-          console.log(error);
-        }
+    app.delete("/agent-properties/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await agentAddedPropertiesCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
       }
-    );
+    });
 
     //get offer properties for agent
-    app.get(
-      "/requested-properties",
-      verifyToken,
-      verifyAgent,
-      async (req, res) => {
-        try {
-          let query = { status: "pending" };
+    app.get("/requested-properties", verifyToken, async (req, res) => {
+      try {
+        let query = { status: "pending" };
 
-          if (req.query?.email) {
-            query.agentEmail = req.query.email;
-          }
-
-          console.log(query);
-
-          const result = await offerPropertiesCollection.find(query).toArray();
-
-          res.send(result);
-        } catch (error) {
-          console.log(error);
+        if (req.query?.email) {
+          query.agentEmail = req.query.email;
         }
+
+        console.log(query);
+
+        const result = await offerPropertiesCollection.find(query).toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.log(error);
       }
-    );
+    });
 
     //post advertise properties
     app.post(
@@ -540,18 +516,13 @@ async function run() {
     );
 
     //add agent properties to all properties
-    app.post(
-      "/add-to-properties",
-      verifyToken,
-      verifyAdmin,
-      async (req, res) => {
-        const property = req.body;
-        console.log(property);
-        const result = await propertiesCollection.insertOne(property);
-        console.log(result);
-        res.send(result);
-      }
-    );
+    app.post("/add-to-properties", verifyToken, async (req, res) => {
+      const property = req.body;
+      console.log(property);
+      const result = await propertiesCollection.insertOne(property);
+      console.log(result);
+      res.send(result);
+    });
 
     // verify and add to all properties
     app.patch(
