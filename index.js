@@ -124,21 +124,42 @@ async function run() {
       }
     });
 
-    app.get("/sort-properties", verifyToken, async (req, res) => {
-      // console.log("hi---------------->", req.decoded);
+    //get properties by name
+    app.get("/search-properties/:title",verifyToken, async (req, res) => {
       try {
-        const verifiedProperties = await propertiesCollection
-          .find({
-            status: "verified",
-          })
-          .sort()
-          .toArray();
-        // console.log(verifiedProperties)
-        res.send(verifiedProperties);
+        const title = req.params.title;
+        let query = { title: title };
+        console.log(title);
+        const result = await propertiesCollection.find(query).toArray();
+        res.send(result);
       } catch (error) {
         console.log(error);
       }
     });
+
+    app.get("/sort-properties",verifyToken, async (req, res) => {
+      try {
+        const { order, field } = req.query;
+        const sortOptions = {};
+        if (order && (order.toLowerCase() === "asc" || order.toLowerCase() === "desc")) {
+          sortOptions[`priceRange.min`] = order.toLowerCase() === "asc" ? 1 : -1;
+        } else { sortOptions["priceRange.min"] = 1;
+        }
+    
+        const verifiedProperties = await propertiesCollection
+          .find({
+            status: "verified",
+          })
+          .sort(sortOptions)
+          .toArray();
+        res.send(verifiedProperties);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+    
+    
 
     //get single properties
     app.get("/properties2/:id", verifyToken, async (req, res) => {
@@ -438,15 +459,15 @@ async function run() {
       try {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
-        console.log(filter);
+        // console.log(filter);
         const updatedDoc = {
           $set: {
             adStatus: "advertised",
           },
         };
-        console.log(updatedDoc);
+        // console.log(updatedDoc);
         const result = await propertiesCollection.updateOne(filter, updatedDoc);
-        console.log(result);
+        // console.log(result);
         res.send(result);
       } catch (error) {
         console.error(error);
@@ -464,7 +485,7 @@ async function run() {
           const getProperty = await advertiseCollection.deleteOne(query);
 
           console.log(getProperty);
-          res.send(result);
+          res.send(getProperty);
         } catch (error) {
           console.error(error);
         }
@@ -473,7 +494,7 @@ async function run() {
 
     //todo
     // ads status properties
-    app.put(
+    app.patch(
       "/remove-status/:id",
       verifyToken,
       verifyAdmin,
@@ -481,18 +502,18 @@ async function run() {
         try {
           const id = req.params.id;
           const filter = { _id: new ObjectId(id) };
-          console.log(filter);
+          console.log('i----->',filter);
           const updatedDoc = {
-            $unset: {
-              adStatus: 1,
+            $set: {
+              adStatus: "notAdd",
             },
           };
-          console.log(updatedDoc);
+          console.log('i----->',updatedDoc);
           const result = await propertiesCollection.updateOne(
             filter,
             updatedDoc
           );
-          console.log(result);
+          console.log('i----->',result);
           res.send(result);
         } catch (error) {
           console.error(error);
@@ -798,10 +819,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
