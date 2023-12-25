@@ -96,7 +96,7 @@ async function run() {
     };
 
     //post users
-    app.post("/users", verifyToken, async (req, res) => {
+    app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
       const existingUser = await usersCollection.findOne(query);
@@ -137,7 +137,7 @@ async function run() {
       }
     });
 
-    app.get("/sort-properties",verifyToken, async (req, res) => {
+    app.get("/sort-properties", async (req, res) => {
       try {
         const { order, field } = req.query;
         const sortOptions = {};
