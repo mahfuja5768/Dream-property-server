@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -112,10 +112,14 @@ async function run() {
     app.get("/properties", verifyToken, async (req, res) => {
       // console.log("hi---------------->", req.decoded);
       try {
+        const page = parseInt(req.query.page);
+        const size = parseInt(req.query.size);
         const verifiedProperties = await propertiesCollection
           .find({
             status: "verified",
           })
+          .skip(page * size)
+          .limit(size)
           .toArray();
         // console.log(verifiedProperties)
         res.send(verifiedProperties);
@@ -124,8 +128,15 @@ async function run() {
       }
     });
 
+    //foods limit count
+    app.get("/properties-count",verifyToken, async (req, res) => {
+      const count = await propertiesCollection.estimatedDocumentCount();
+      // console.log(count);
+      res.send({ count });
+    });
+
     //get properties by name
-    app.get("/search-properties/:title",verifyToken, async (req, res) => {
+    app.get("/search-properties/:title", verifyToken, async (req, res) => {
       try {
         const title = req.params.title;
         let query = { title: title };
@@ -141,11 +152,16 @@ async function run() {
       try {
         const { order, field } = req.query;
         const sortOptions = {};
-        if (order && (order.toLowerCase() === "asc" || order.toLowerCase() === "desc")) {
-          sortOptions[`priceRange.min`] = order.toLowerCase() === "asc" ? 1 : -1;
-        } else { sortOptions["priceRange.min"] = 1;
+        if (
+          order &&
+          (order.toLowerCase() === "asc" || order.toLowerCase() === "desc")
+        ) {
+          sortOptions[`priceRange.min`] =
+            order.toLowerCase() === "asc" ? 1 : -1;
+        } else {
+          sortOptions["priceRange.min"] = 1;
         }
-    
+
         const verifiedProperties = await propertiesCollection
           .find({
             status: "verified",
@@ -158,8 +174,6 @@ async function run() {
         res.status(500).send("Internal Server Error");
       }
     });
-    
-    
 
     //get single properties
     app.get("/properties2/:id", verifyToken, async (req, res) => {
@@ -502,18 +516,18 @@ async function run() {
         try {
           const id = req.params.id;
           const filter = { _id: new ObjectId(id) };
-          console.log('i----->',filter);
+          console.log("i----->", filter);
           const updatedDoc = {
             $set: {
               adStatus: "notAdd",
             },
           };
-          console.log('i----->',updatedDoc);
+          console.log("i----->", updatedDoc);
           const result = await propertiesCollection.updateOne(
             filter,
             updatedDoc
           );
-          console.log('i----->',result);
+          console.log("i----->", result);
           res.send(result);
         } catch (error) {
           console.error(error);
