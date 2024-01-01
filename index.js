@@ -6,7 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -128,8 +128,8 @@ async function run() {
       }
     });
 
-    //foods limit count
-    app.get("/properties-count",verifyToken, async (req, res) => {
+    //properties limit count
+    app.get("/properties-count", verifyToken, async (req, res) => {
       const count = await propertiesCollection.estimatedDocumentCount();
       // console.log(count);
       res.send({ count });
@@ -284,11 +284,28 @@ async function run() {
     });
 
     //get wishlist properties
-    app.get("/user-wishlists/:email", verifyToken, async (req, res) => {
+    app.get("/user-wishlists", verifyToken, async (req, res) => {
       try {
-        const email = req.params.email;
+        const email = req.query?.email;
         const query = { email: email };
-        const result = await wishlistCollection.find(query).toArray();
+        const page = parseInt(req.query.page);
+        const size = parseInt(req.query.size);
+        const result = await wishlistCollection
+          .find(query)
+          .skip(page * size)
+          .limit(size)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    app.get("/wishlists/:id", verifyToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await wishlistCollection.findOne(query);
         res.send(result);
       } catch (error) {
         console.log(error);
