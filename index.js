@@ -109,7 +109,7 @@ async function run() {
     });
 
     // get properties
-    app.get("/properties", verifyToken, async (req, res) => {
+    app.get("/properties", async (req, res) => {
       // console.log("hi---------------->", req.decoded);
       try {
         const page = parseInt(req.query.page);
@@ -129,14 +129,14 @@ async function run() {
     });
 
     //properties limit count
-    app.get("/properties-count", verifyToken, async (req, res) => {
+    app.get("/properties-count", async (req, res) => {
       const count = await propertiesCollection.estimatedDocumentCount();
       // console.log(count);
       res.send({ count });
     });
 
     //get properties by name
-    app.get("/search-properties/:title", verifyToken, async (req, res) => {
+    app.get("/search-properties/:title", async (req, res) => {
       try {
         const title = req.params.title;
         let query = { title: title };
